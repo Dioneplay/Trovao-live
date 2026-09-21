@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>TROVÃO AZUL — LIVE QUADRA OFICIAL</title>
+
+  <meta name="theme-color" content="#00f0ff">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <!-- FONTE SCI-FI FUTURISTA -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+
+  <!-- SOCKET.IO CLIENT -->
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+
+  <style>
+    :root {
+      --bg-dark: #010408;
+      --panel-bg: rgba(6, 18, 38, 0.9);
+      --cyan-neon: #00f0ff;
+      --cyan-glow: rgba(0, 240, 255, 0.4);
+      --blue-border: #0a5296;
+      --green-status: #00ff66;
+      --red-alert: #ff2a4b;
+      --text-muted: #6482a6;
+      --font-title: 'Orbitron', sans-serif;
+      --font-body: 'Rajdhani', sans-serif;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: var(--font-body); }
+
+    body {
+      background: var(--bg-dark);
+      background-image: radial-gradient(circle at 50% 20%, #03152e 0%, #010408 80%);
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding-bottom: 70px;
+    }
+
+    /* HEADER HUD TOP BAR */
+    .top-header {
+      background: rgba(2, 10, 22, 0.95);
+      border-bottom: 2px solid var(--blue-border);
+      padding: 10px 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 0 15px var(--cyan-glow);
+    }
+
+    .brand-logo h1 { font-family: var(--font-title); font-size: 1.1rem; color: #fff; text-shadow: 0 0 8px var(--cyan-neon); }
+    .brand-logo span { font-size: 0.65rem; color: var(--cyan-neon); letter-spacing: 2px; }
+
+    /* LAYOUT GRID DASHBOARD */
+    .dashboard-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      padding: 12px;
+      max-width: 1600px;
+      margin: 0 auto;
+      width: 100%;
+    }
+    @media (max-width: 900px) { .dashboard-container { grid-template-columns: 1fr; } }
+
+    .hud-box {
+      background: var(--panel-bg);
+      border: 1px solid var(--blue-border);
+      border-radius: 6px;
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+
+    .hud-box-header {
+      background: rgba(0, 0, 0, 0.6);
+      border-bottom: 1px solid rgba(0, 240, 255, 0.2);
+      padding: 6px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--font-title);
+      font-size: 0.75rem;
+      color: var(--cyan-neon);
+    }
+
+    /* VÍDEO PRINCIPAL */
+    .cam-viewport {
+      position: relative;
+      aspect-ratio: 16/9;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .cam-viewport video { width: 100%; height: 100%; object-fit: cover; }
+
+    /* PAINEL QUADRADO DO AVATAR IA */
+    .avatar-viewport {
+      position: relative;
+      aspect-ratio: 16/9;
+      background: #020b18;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--cyan-neon);
+      box-shadow: inset 0 0 15px rgba(0, 240, 255, 0.2);
+    }
+
+    .avatar-img {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      border: 3px solid var(--cyan-neon);
+      box-shadow: 0 0 20px var(--cyan-neon);
+      object-fit: cover;
+      animation: pulseGlow 2s infinite alternate;
+    }
+
+    @keyframes pulseGlow {
+      from { box-shadow: 0 0 10px var(--cyan-neon); }
+      to { box-shadow: 0 0 25px var(--cyan-neon); }
+    }
+
+    .avatar-speech-bubble {
+      background: rgba(0, 0, 0, 0.85);
+      border: 1px solid var(--cyan-neon);
+      color: #fff;
+      padding: 8px 12px;
+      border-radius: 6px;
+      margin-top: 10px;
+      font-size: 0.8rem;
+      max-width: 90%;
+      text-align: center;
+    }
+
+    /* 5 CADEIRAS DE PARTICIPANTES */
+    .chairs-grid-5 {
+      display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; padding: 10px;
+    }
+    .chair-slot {
+      background: rgba(0, 0, 0, 0.5); border: 1px solid var(--blue-border);
+      border-radius: 4px; padding: 8px 4px; text-align: center;
+    }
+    .chair-slot.occupied { border-color: var(--green-status); box-shadow: 0 0 8px rgba(0, 255, 102, 0.3); }
+
+    /* BOTÕES HUD */
+    .btn-hud {
+      background: rgba(0, 240, 255, 0.15); border: 1px solid var(--cyan-neon);
+      color: #fff; padding: 8px; border-radius: 4px; font-size: 0.75rem;
+      font-weight: bold; cursor: pointer; text-align: center; width: 100%;
+      transition: 0.2s;
+    }
+    .btn-hud:hover { background: var(--cyan-neon); color: #000; }
+
+    .bottom-bar {
+      background: rgba(4, 10, 20, 0.95);
+      border-top: 1px solid var(--blue-border);
+      padding: 10px; display: flex; justify-content: center; gap: 10px;
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+    }
+  </style>
+</head>
+<body>
+
+  <header class="top-header">
+    <div class="brand-logo">
+      <h1>⚡ TROVÃO AZUL</h1>
+      <span>LIVE QUADRA & AVATAR IA</span>
+    </div>
+    <div style="font-family:var(--font-title); font-size:0.75rem; color:var(--cyan-neon);">
+      SISTEMA TRADUTOR IA ATIVO
+    </div>
+  </header>
+
+  <div class="dashboard-container">
+    <!-- COLUNA ESQUERDA: CÂMERA PRINCIPAL E INDICAÇÃO -->
+    <div>
+      <div class="hud-box">
+        <div class="hud-box-header">
+          <span>CÂMERA PRINCIPAL • AO VIVO</span>
+          <span style="color:var(--green-status);">VIEWERS REAIS: <b id="numViewers">0</b></span>
+        </div>
+        <div class="cam-viewport">
+          <video id="mainVideo" autoplay playsinline muted></video>
+        </div>
+      </div>
+
+      <div class="hud-box">
+        <div class="hud-box-header">
+          <span>SEU LINK ÚNICO DE INDICAÇÃO</span>
+          <span style="color:var(--cyan-neon);">CONVIDADOS: <b id="numIndicados">0</b></span>
+        </div>
+        <div style="padding:10px;">
+          <input type="text" id="shareLinkInput" readonly style="width:100%; background:#000; border:1px solid var(--blue-border); color:var(--cyan-neon); padding:8px; border-radius:4px; font-size:0.8rem; margin-bottom:8px;">
+          <button class="btn-hud" onclick="copiarLink()">COPIAR MEU LINK</button>
+          
+          <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; margin-top:8px;">
+            <button class="btn-hud" onclick="shareNet('whatsapp')">WhatsApp</button>
+            <button class="btn-hud" onclick="shareNet('telegram')">Telegram</button>
+            <button class="btn-hud" onclick="shareNet('facebook')">Facebook</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- COLUNA DIREITA: AVATAR IA, CADEIRAS E FERRAMENTAS -->
+    <div>
+      <div class="hud-box">
+        <div class="hud-box-header">
+          <span>AVATAR IA DOLLY • TRADUTORA MULTI-IDIOMAS</span>
+          <span style="color:var(--green-status);" id="avatarStatus">● ONLINE</span>
+        </div>
+        <div class="avatar-viewport">
+          <img src="https://cdn-icons-png.flaticon.com/512/4140/4140048.png" class="avatar-img" alt="Avatar IA Dolly">
+          <div class="avatar-speech-bubble" id="avatarText">
+            "Olá! Fale qualquer idioma no microfone e eu traduzo em tempo real com voz humana!"
+          </div>
+        </div>
+        <div style="padding:10px; display:flex; gap:6px;">
+          <button class="btn-hud" onclick="ouvirETraduzir()">🎙️ OUVIR & TRADUZIR VOZ</button>
+          <select id="selectLang" style="background:#000; color:var(--cyan-neon); border:1px solid var(--blue-border); padding:6px; border-radius:4px; font-weight:bold;">
+            <option value="pt-BR">Português</option>
+            <option value="fr-FR">Francês</option>
+            <option value="en-US">Inglês</option>
+            <option value="es-ES">Espanhol</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="hud-box">
+        <div class="hud-box-header"><span>5 CADEIRAS DE PARTICIPANTES</span></div>
+        <div class="chairs-grid-5" id="chairsGrid"></div>
+      </div>
+
+      <div class="hud-box">
+        <div class="hud-box-header"><span>CONTROLES DE TRANSMISSÃO & GRAVAÇÃO</span></div>
+        <div style="padding:10px; display:grid; grid-template-columns: repeat(3, 1fr); gap:6px;">
+          <button class="btn-hud" onclick="ativarTelaFlutuante()">🗔 FLUTUANTE (PIP)</button>
+          <button class="btn-hud" onclick="capturarTela()">🖥️ CAPTURAR TELA</button>
+          <button class="btn-hud" id="btnRecord" onclick="alternarGravacao()" style="border-color:var(--red-alert);">🔴 GRAVAR LIVE</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-bar">
+    <button class="btn-hud" style="width:auto; padding:8px 20px;" onclick="copiarLink()">🔗 COPIAR LINK DE CONVITE</button>
+  </div>
+
+  <script>
+    const socket = io(window.location.origin);
+    let mediaStream = null;
+    let mediaRecorder = null;
+    let recordedChunks = [];
+    let isRecording = false;
+
+    // INICIALIZAÇÃO AUTOMÁTICA SEM TELAS DE SOLICITAÇÃO
+    window.addEventListener('DOMContentLoaded', () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const refCode = urlParams.get('ref');
+
+      const randomId = Math.floor(1000 + Math.random() * 9000);
+      const autoUser = `User_${randomId}`;
+      const myRef = `${window.location.origin}${window.location.pathname}?ref=${autoUser}`;
+
+      document.getElementById('shareLinkInput').value = myRef;
+      socket.emit('registrar_usuario', { nome: autoUser, referenciadorCode: refCode });
+
+      iniciarCamera();
+    });
+
+    socket.on('atualizar_viewers_reais', (data) => {
+      document.getElementById('numViewers').textContent = data.total;
+    });
+
+    socket.on('indicacao_computada', (data) => {
+      document.getElementById('numIndicados').textContent = data.total;
+    });
+
+    socket.on('cadeiras_atualizadas', (cadeiras) => {
+      const grid = document.getElementById('chairsGrid');
+      grid.innerHTML = '';
+
+      cadeiras.forEach((c, idx) => {
+        if (c) {
+          grid.innerHTML += `
+            <div class="chair-slot occupied">
+              <div style="font-size:1.2rem;">👤</div>
+              <div style="font-size:0.6rem; font-weight:bold; color:#fff; overflow:hidden;">${c.nome}</div>
+              <button onclick="desocuparCadeira(${idx})" style="background:var(--red-alert); color:#fff; border:none; padding:2px 4px; font-size:0.55rem; border-radius:2px; cursor:pointer; margin-top:2px;">SAIR</button>
+            </div>
+          `;
+        } else {
+          grid.innerHTML += `
+            <div class="chair-slot">
+              <div style="font-size:1.2rem;">🪑</div>
+              <div style="font-size:0.6rem; color:var(--text-muted);">Livre</div>
+              <button onclick="ocuparCadeira(${idx})" style="background:var(--cyan-neon); color:#000; font-weight:bold; border:none; padding:2px 4px; font-size:0.55rem; border-radius:2px; cursor:pointer; margin-top:2px;">SENTAR</button>
+            </div>
+          `;
+        }
+      });
+    });
+
+    function ocuparCadeira(idx) { socket.emit('ocupar_cadeira', { index: idx }); }
+    function desocuparCadeira(idx) { socket.emit('desocupar_cadeira', { index: idx }); }
+
+    async function iniciarCamera() {
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        document.getElementById('mainVideo').srcObject = mediaStream;
+      } catch (e) {
+        console.log('Câmera ou Microfone não detectados.');
+      }
+    }
+
+    // RECONHECIMENTO DE VOZ & REPRODUÇÃO DO AVATAR IA
+    function ouvirETraduzir() {
+      const status = document.getElementById('avatarStatus');
+      const textBubble = document.getElementById('avatarText');
+      const lang = document.getElementById('selectLang').value;
+
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+      if (!SpeechRecognition) {
+        alert('Navegador não possui suporte nativo para reconhecimento de voz.');
+        return;
+      }
+
+      const recognition = new SpeechRecognition();
+      recognition.lang = lang;
+      status.textContent = '● OUVINDO...';
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        status.textContent = '● TRADUZINDO...';
+
+        textBubble.textContent = `"${transcript}"`;
+        falarTexto(transcript, lang);
+      };
+
+      recognition.onerror = () => { status.textContent = '● ERRO AO OUVIR'; };
+      recognition.start();
+    }
+
+    function falarTexto(texto, lang) {
+      const utterance = new SpeechSynthesisUtterance(texto);
+      utterance.lang = lang;
+      utterance.rate = 1.0;
+      utterance.onend = () => {
+        document.getElementById('avatarStatus').textContent = '● ONLINE';
+      };
+      window.speechSynthesis.speak(utterance);
+    }
+
+    async function ativarTelaFlutuante() {
+      const video = document.getElementById('mainVideo');
+      try {
+        if (document.pictureInPictureElement) {
+          await document.exitPictureInPicture();
+        } else {
+          await video.requestPictureInPicture();
+        }
+      } catch (err) {
+        alert('Tela flutuante indisponível no dispositivo.');
+      }
+    }
+
+    async function capturarTela() {
+      try {
+        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        document.getElementById('mainVideo').srcObject = screenStream;
+      } catch (e) {
+        alert('Captura de tela cancelada.');
+      }
+    }
+
+    function alternarGravacao() {
+      const video = document.getElementById('mainVideo');
+      const btn = document.getElementById('btnRecord');
+
+      if (!isRecording) {
+        if (!video.srcObject) return alert('Ligue a câmera antes de gravar.');
+        recordedChunks = [];
+        mediaRecorder = new MediaRecorder(video.srcObject);
+        mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(recordedChunks, { type: 'video/webm' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `live-trovao-azul-${Date.now()}.webm`;
+          a.click();
+        };
+        mediaRecorder.start();
+        isRecording = true;
+        btn.textContent = '⏹️ PARAR';
+        btn.style.background = 'var(--red-alert)';
+      } else {
+        mediaRecorder.stop();
+        isRecording = false;
+        btn.textContent = '🔴 GRAVAR LIVE';
+        btn.style.background = 'rgba(0, 240, 255, 0.15)';
+      }
+    }
+
+    function copiarLink() {
+      const input = document.getElementById('shareLinkInput');
+      input.select();
+      navigator.clipboard.writeText(input.value);
+      alert('Seu link único de indicação foi copiado!');
+    }
+
+    function shareNet(rede) {
+      const link = encodeURIComponent(document.getElementById('shareLinkInput').value);
+      const text = encodeURIComponent("Entre na minha transmissão ao vivo no Trovão Azul!");
+      if (rede === 'whatsapp') window.open(`https://api.whatsapp.com/send?text=${text}%20${link}`);
+      if (rede === 'telegram') window.open(`https://t.me/share/url?url=${link}&text=${text}`);
+      if (rede === 'facebook') window.open(`https://www.facebook.com/sharer/sharer.php?u=${link}`);
+    }
+  </script>
+</body>
+</html>
